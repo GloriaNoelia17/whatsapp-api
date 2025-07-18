@@ -1,4 +1,4 @@
-import { Controller, Body, Post, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Body, Post, HttpException, HttpStatus, Get } from '@nestjs/common';
 //importar el servicio
 import { MessagesService } from './messages.service';
 
@@ -24,5 +24,10 @@ export class MessagesController {
             HttpStatus.INTERNAL_SERVER_ERROR,
         );
         }
+    }
+
+    @Get('InitSession')
+    async initSession(){
+        return "retorna un qr"
     }
 }
