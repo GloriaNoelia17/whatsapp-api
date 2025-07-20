@@ -18,4 +18,11 @@ export class AuthController {
         return { image };
     }
 
+    @Get('status')
+    getStatus(): { connected: boolean } {
+        const connected = this.authService.isConnected();
+        return { connected };
+    }
+
+
 }

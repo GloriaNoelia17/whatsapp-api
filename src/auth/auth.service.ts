@@ -7,7 +7,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import * as fs from 'fs';
 import * as QRCode from 'qrcode';
-//import * as P from 'pino';
+import P from 'pino';
 
 @Injectable()
 export class AuthService {
@@ -21,7 +21,8 @@ export class AuthService {
         const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
         this.socket = makeWASocket({
-            auth: state
+            auth: state,
+            logger: P({ level: 'silent' }) // Desactiva la salida de logs en consola
         });
 
         this.socket.ev.on('creds.update', saveCreds);
@@ -63,4 +64,13 @@ export class AuthService {
         // Generar imagen QR a partir del código QR
         return await QRCode.toDataURL(this.qrCode); // retorna base64
     }
+
+    isConnected(): boolean {
+    return !!this.socket?.user; // true si está conectado
+    }
+
+    getSocket(): WASocket {
+        return this.socket;
+    }
+
 }

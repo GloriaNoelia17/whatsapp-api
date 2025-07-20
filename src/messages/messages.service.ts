@@ -1,53 +1,53 @@
-import { Injectable, Logger } from '@nestjs/common';
-import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
-import * as fs from 'fs';
-import * as path from 'path';
+// src/messages/messages.service.ts
+import { Injectable } from '@nestjs/common';
+import { AuthService } from '../auth/auth.service';
+import * as xlsx from 'xlsx';
 
 @Injectable()
 export class MessagesService {
+    //private readonly logger = new Logger(MessagesService.name);
+    constructor(private readonly authService: AuthService) { }
 
-    private socket: any;
-    private isInitialized = false;
-    private readonly logger = new Logger(MessagesService.name);
 
-    async initWhatsApp(): Promise<void> {
-        if (this.isInitialized) return;
-
-        const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
-        const { version } = await fetchLatestBaileysVersion();
-
-        this.socket = makeWASocket({
-            version,
-            auth: state,
-            printQRInTerminal: true,
-        });
-
-        this.socket.ev.on('creds.update', saveCreds);
-        this.socket.ev.on('connection.update', (update) => {
-            const { connection, lastDisconnect } = update;
-            if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
-                this.logger.warn('Conexión cerrada, ¿reconectar? ' + shouldReconnect);
-                if (shouldReconnect) this.initWhatsApp();
-            } else if (connection === 'open') {
-                this.logger.log('✅ Conectado a WhatsApp correctamente');
-            }
-        });
-
-        this.isInitialized = true;
-    }
-
-    async sendMessage(phone: string, message: string): Promise<string> {
+    async sendExcelWithMessage(buffer: Buffer, message: string): Promise<string> {
         try {
-            if (!this.isInitialized) await this.initWhatsApp();
+            const sock = this.authService.getSocket();
+            const workbook = xlsx.read(buffer, { type: 'buffer' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+            const rows = data.slice(1).filter((row) => Array.isArray(row) && row[1]);
 
-            const jid = phone.includes('@s.whatsapp.net') ? phone : `${phone}@s.whatsapp.net`;
-            await this.socket.sendMessage(jid, { text: message });
-            this.logger.log(`📤 Mensaje enviado a ${phone}`);
-            return `Mensaje enviado a ${phone}`;
-        } catch (error) {
-            this.logger.error(`❌ Error al enviar a ${phone}:`, error);
-            throw error;
+            for (let row of rows) {
+                const nombreContacto = String((row as any[])[0] || 'Contacto').trim();
+                const numero = String((row as any[])[1]).replace(/\D/g, '');
+
+                if (!/^\d{6,15}$/.test(numero)) {
+                    console.log('Numero inválido:', numero);
+
+                    continue;
+                }
+
+                const numeroConPrefijo = `51${numero}`;
+                const waId = `${numeroConPrefijo}@s.whatsapp.net`;
+
+                const exists = await sock.onWhatsApp(numeroConPrefijo);
+                if (!exists) {
+                    console.log(`No existe en WhatsApp: ${numeroConPrefijo}`);
+                    continue;
+                }
+
+                await sock.sendMessage(waId, {
+                    text: message.replace('{nombre}', nombreContacto),
+                });
+
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+            }
+
+            return '✅ Mensajes enviados correctamente.';
+        } catch (err) {
+            console.error('Error al procesar el Excel:', err);
+            throw err;
         }
     }
 }
