@@ -9,7 +9,7 @@ export class MessagesService {
     constructor(private readonly authService: AuthService) { }
 
 
-    async sendExcelWithMessage(buffer: Buffer, message: string): Promise<string> {
+    async sendMessage(buffer: Buffer,message: string,imageBuffer: Buffer | null = null,): Promise<string> {
         try {
             const sock = this.authService.getSocket();
             const workbook = xlsx.read(buffer, { type: 'buffer' });
@@ -36,15 +36,23 @@ export class MessagesService {
                     console.log(`No existe en WhatsApp: ${numeroConPrefijo}`);
                     continue;
                 }
-
-                await sock.sendMessage(waId, {
-                    text: message.replace('{nombre}', nombreContacto),
-                });
+                //modificar las variables del mensaje
+                const textoFinal = message.replace('{nombre}', nombreContacto);
+                if (imageBuffer) {
+                    await sock.sendMessage(waId, {
+                    image: imageBuffer,
+                    caption: textoFinal,
+                    });
+                } else {
+                    await sock.sendMessage(waId, {
+                    text: textoFinal,
+                    });
+                }
 
                 await new Promise((resolve) => setTimeout(resolve, 3000));
             }
 
-            return '✅ Mensajes enviados correctamente.';
+            return 'Mensajes enviados correctamente.';
         } catch (err) {
             console.error('Error al procesar el Excel:', err);
             throw err;

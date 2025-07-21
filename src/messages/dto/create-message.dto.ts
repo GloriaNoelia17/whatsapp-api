@@ -2,6 +2,9 @@ import { IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateMessageDto {
   @IsString()
-  @IsNotEmpty()
+  //@IsNotEmpty()
   readonly message: string;
+
+  @IsNotEmpty()
+  readonly includeImage: boolean;
 }

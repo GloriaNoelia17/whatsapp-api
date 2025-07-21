@@ -1,13 +1,13 @@
 import {
     Controller,
     Post,
-    UploadedFile,
+    UploadedFiles,
     UseInterceptors,
     Body,
     HttpException,
     HttpStatus,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { MessagesService } from './messages.service';
 
@@ -16,19 +16,26 @@ export class MessagesController {
     constructor(private readonly messagesService: MessagesService) { }
 
     @Post()
-    @UseInterceptors(FileInterceptor('file'))
+    @UseInterceptors(AnyFilesInterceptor())
     async sendMessage(
-        @UploadedFile() file: Express.Multer.File,
+        @UploadedFiles() files: Express.Multer.File[],
         @Body() body: CreateMessageDto,
     ) {
         try {
-            if (!file) {
-                throw new HttpException('Archivo no recibido', HttpStatus.BAD_REQUEST);
+            let imageFile: Express.Multer.File | undefined;
+            const excelFile = files.find(f => f.fieldname === 'file');
+            if (!excelFile) {
+                throw new HttpException('Archivo Excel no recibido', HttpStatus.BAD_REQUEST);
             }
 
-            const result = await this.messagesService.sendExcelWithMessage(
-                file.buffer,
+            if( body.includeImage){
+                imageFile = files.find(f => f.fieldname === 'image');
+            }
+
+            const result = await this.messagesService.sendMessage(
+                excelFile.buffer,
                 body.message,
+                imageFile?.buffer || null,
             );
 
             return { success: true, result };
